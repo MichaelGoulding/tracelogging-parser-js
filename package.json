@@ -1,0 +1,12 @@
+{
+  "name": "etl-js",
+  "version": "1.0.0",
+  "description": "TraceLogging ETL file parser for JavaScript/browser - pure JS, zero dependencies",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test/test.js"
+  },
+  "keywords": ["etl", "etw", "tracelogging", "windows", "parser", "binary"],
+  "license": "Apache-2.0",
+  "type": "commonjs"
+}
