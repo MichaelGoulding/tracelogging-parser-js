@@ -16,6 +16,9 @@ const { readWmiBufferHeader, WMI_BUFFER_HEADER_SIZE, EventTraceGroup } = require
 const { parseChunkPayload } = require('./records');
 const { parseTraceLoggingEvent } = require('./tracelogging');
 const { InvalidEtlFileHeader, TraceLoggingMetaDataNotFound } = require('./errors');
+const { decompressXpress } = require('./xpress');
+
+const ETW_BUFFER_FLAG_COMPRESSED = 0x40;
 
 /**
  * Parse ETL chunks from the raw file buffer.
@@ -30,22 +33,34 @@ function parseChunks(buffer) {
     const chunkStart = reader.tell();
     const header = readWmiBufferHeader(reader);
 
-    const payloadSize = header.savedOffset - WMI_BUFFER_HEADER_SIZE;
-    if (payloadSize < 0 || payloadSize > reader.remaining) {
-      break;
-    }
-    const payload = reader.readBytesCopy(payloadSize);
+    const isCompressed = !!(header.bufferFlag & ETW_BUFFER_FLAG_COMPRESSED);
 
-    // Skip padding to reach the next chunk
-    const paddingSize = header.bufferSize - header.savedOffset;
-    if (paddingSize > 0 && paddingSize <= reader.remaining) {
-      reader.skip(paddingSize);
-    } else if (paddingSize > reader.remaining) {
-      // Last chunk may have truncated padding
-      reader.seek(reader.length);
-    }
+    if (isCompressed) {
+      // For compressed buffers:
+      // bufferSize = compressed size on disk (including header)
+      // savedOffset = uncompressed size (including header)
+      const compressedSize = header.bufferSize - WMI_BUFFER_HEADER_SIZE;
+      const uncompressedSize = header.savedOffset - WMI_BUFFER_HEADER_SIZE;
 
-    chunks.push({ header, payload });
+      if (compressedSize < 0 || compressedSize > reader.remaining) break;
+      const compressedData = reader.readBytesCopy(compressedSize);
+      const payload = decompressXpress(compressedData, uncompressedSize);
+      chunks.push({ header, payload });
+    } else {
+      const payloadSize = header.savedOffset - WMI_BUFFER_HEADER_SIZE;
+      if (payloadSize < 0 || payloadSize > reader.remaining) break;
+      const payload = reader.readBytesCopy(payloadSize);
+
+      // Skip padding to reach the next chunk
+      const paddingSize = header.bufferSize - header.savedOffset;
+      if (paddingSize > 0 && paddingSize <= reader.remaining) {
+        reader.skip(paddingSize);
+      } else if (paddingSize > reader.remaining) {
+        reader.seek(reader.length);
+      }
+
+      chunks.push({ header, payload });
+    }
   }
 
   return chunks;
