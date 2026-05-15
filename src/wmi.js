@@ -91,26 +91,6 @@ function readWmiTracePacket(reader) {
 // Event trace groups (from EventTraceGroup enum)
 const EventTraceGroup = {
   HEADER: 0x00,
-  IO: 0x01,
-  MEMORY: 0x02,
-  PROCESS: 0x03,
-  FILE: 0x04,
-  THREAD: 0x05,
-  TCPIP: 0x06,
-  JOB: 0x07,
-  UDPIP: 0x08,
-  REGISTRY: 0x09,
-  DBGPRINT: 0x0a,
-  CONFIG: 0x0b,
-  PERFINFO: 0x0f,
-  HEAP: 0x10,
-  OBJECT: 0x11,
-  POWER: 0x12,
-  IMAGE: 0x14,
-  DPC: 0x15,
-  STACKWALK: 0x18,
-  ALPC: 0x1a,
-  SPLITIO: 0x1b,
 };
 
 module.exports = {
@@ -120,3 +100,4 @@ module.exports = {
   readWmiTracePacket,
   EventTraceGroup,
 };
+

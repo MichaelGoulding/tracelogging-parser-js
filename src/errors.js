@@ -27,17 +27,9 @@ class TraceLoggingUnhandledTag extends EtlError {
   }
 }
 
-class ParseError extends EtlError {
-  constructor(message) {
-    super(message);
-    this.name = 'ParseError';
-  }
-}
-
 module.exports = {
   EtlError,
   InvalidEtlFileHeader,
   TraceLoggingMetaDataNotFound,
   TraceLoggingUnhandledTag,
-  ParseError,
 };

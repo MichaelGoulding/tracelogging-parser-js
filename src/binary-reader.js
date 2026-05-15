@@ -203,23 +203,6 @@ class BinaryReader {
   }
 
   /**
-   * Read a GUID and return as an object with raw fields.
-   * @returns {{ data1: number, data2: number, data3: number, data4: Uint8Array, toString: () => string }}
-   */
-  readGuidRaw() {
-    const data1 = this.readUint32();
-    const data2 = this.readUint16();
-    const data3 = this.readUint16();
-    const data4 = this.readBytesCopy(8);
-
-    const hex = (v, len) => v.toString(16).padStart(len, '0');
-    const d4Hex = Array.from(data4).map(b => hex(b, 2)).join('');
-    const str = `${hex(data1, 8)}-${hex(data2, 4)}-${hex(data3, 4)}-${d4Hex.slice(0, 4)}-${d4Hex.slice(4)}`;
-
-    return { data1, data2, data3, data4, toString: () => str };
-  }
-
-  /**
    * Read a Windows SYSTEMTIME structure (16 bytes).
    */
   readSystemTime() {

@@ -15,7 +15,7 @@ const { BinaryReader } = require('./binary-reader');
 const { readWmiBufferHeader, WMI_BUFFER_HEADER_SIZE, EventTraceGroup } = require('./wmi');
 const { parseChunkPayload } = require('./records');
 const { parseTraceLoggingEvent } = require('./tracelogging');
-const { InvalidEtlFileHeader, ParseError, TraceLoggingMetaDataNotFound } = require('./errors');
+const { InvalidEtlFileHeader, TraceLoggingMetaDataNotFound } = require('./errors');
 
 /**
  * Parse ETL chunks from the raw file buffer.
