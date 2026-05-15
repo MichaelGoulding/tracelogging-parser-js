@@ -4,7 +4,8 @@
   "description": "TraceLogging ETL file parser for JavaScript/browser - pure JS, zero dependencies",
   "main": "index.js",
   "scripts": {
-    "test": "node test/test.js"
+    "test": "node test/test.js",
+    "build:viewer": "node viewer/build.js"
   },
   "keywords": ["etl", "etw", "tracelogging", "windows", "parser", "binary"],
   "license": "Apache-2.0",

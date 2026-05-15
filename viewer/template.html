@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TraceLogging ETL Viewer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #1e1e1e; color: #d4d4d4; padding: 16px; }
+  h1 { font-size: 18px; color: #569cd6; margin-bottom: 12px; }
+  .drop-zone {
+    border: 2px dashed #555; border-radius: 8px; padding: 40px; text-align: center;
+    cursor: pointer; transition: border-color 0.2s, background 0.2s; margin-bottom: 16px;
+  }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: #569cd6; background: #252526; }
+  .drop-zone input { display: none; }
+  .status { margin-bottom: 12px; font-size: 13px; color: #888; }
+  .status.error { color: #f44747; }
+  .controls { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .controls input[type="text"] {
+    flex: 1; min-width: 200px; padding: 6px 10px; background: #2d2d2d; border: 1px solid #444;
+    border-radius: 4px; color: #d4d4d4; font-size: 13px;
+  }
+  .controls input[type="text"]::placeholder { color: #666; }
+  .controls label { font-size: 13px; color: #888; white-space: nowrap; }
+  .controls select { padding: 4px 8px; background: #2d2d2d; border: 1px solid #444; border-radius: 4px; color: #d4d4d4; font-size: 13px; }
+  .controls button { padding: 6px 14px; background: #0e639c; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  .controls button:hover { background: #1177bb; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+  thead { position: sticky; top: 0; z-index: 1; }
+  th { background: #252526; color: #569cd6; padding: 6px 8px; text-align: left; border-bottom: 2px solid #444; cursor: pointer; user-select: none; }
+  th:hover { background: #2d2d2d; }
+  td { padding: 4px 8px; border-bottom: 1px solid #333; vertical-align: top; word-break: break-word; }
+  tr:hover td { background: #2a2d2e; }
+  .col-idx { width: 50px; }
+  .col-time { width: 100px; }
+  .col-pid { width: 60px; }
+  .col-tid { width: 60px; }
+  .col-lvl { width: 45px; }
+  .col-id { width: 50px; }
+  .col-event { width: 180px; }
+  .col-provider { width: 120px; }
+  .col-fields { min-width: 200px; }
+  .fields-cell { font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 11px; white-space: pre-wrap; color: #ce9178; }
+  .hidden { display: none; }
+  #table-container { max-height: calc(100vh - 220px); overflow: auto; }
+  .summary { font-size: 13px; color: #888; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<h1>TraceLogging ETL Viewer</h1>
+
+<div class="drop-zone" id="dropZone">
+  <p>Drop an .etl file here or click to browse</p>
+  <input type="file" id="fileInput" accept=".etl">
+</div>
+
+<div class="status" id="status"></div>
+<div class="summary hidden" id="summary"></div>
+
+<div class="controls hidden" id="controls">
+  <input type="text" id="filter" placeholder="Filter events (searches all columns)...">
+  <label>Event:
+    <select id="eventFilter"><option value="">All</option></select>
+  </label>
+  <label>Level:
+    <select id="levelFilter">
+      <option value="">All</option>
+      <option value="1">1 - Critical</option>
+      <option value="2">2 - Error</option>
+      <option value="3">3 - Warning</option>
+      <option value="4">4 - Info</option>
+      <option value="5">5 - Verbose</option>
+    </select>
+  </label>
+  <button id="exportBtn">Export CSV</button>
+</div>
+
+<div id="table-container" class="hidden">
+  <table>
+    <thead>
+      <tr>
+        <th class="col-idx" data-col="index">#</th>
+        <th class="col-time" data-col="timestamp">Timestamp</th>
+        <th class="col-pid" data-col="processId">PID</th>
+        <th class="col-tid" data-col="threadId">TID</th>
+        <th class="col-id" data-col="eventId">ID</th>
+        <th class="col-lvl" data-col="level">Lvl</th>
+        <th class="col-event" data-col="eventName">Event</th>
+        <th class="col-provider" data-col="providerId">Provider</th>
+        <th class="col-fields">Fields</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<script>
+// ============================================================
+// ETL parser library — auto-generated from src/*.js
+// Do not edit this section manually; run: npm run build:viewer
+// ============================================================
+// BUILD:INLINE_JS
+
+// ============================================================
+// UI logic
+// ============================================================
+
+const replacer = (k,v) => typeof v === 'bigint' ? v.toString() : (v instanceof Uint8Array ? `[${v.length} bytes]` : v);
+
+let allRows = [];
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const status = document.getElementById('status');
+const summary = document.getElementById('summary');
+const controls = document.getElementById('controls');
+const tableContainer = document.getElementById('table-container');
+const tbody = document.getElementById('tbody');
+const filterInput = document.getElementById('filter');
+const eventFilter = document.getElementById('eventFilter');
+const levelFilter = document.getElementById('levelFilter');
+const exportBtn = document.getElementById('exportBtn');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); if(e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => { if(fileInput.files.length) loadFile(fileInput.files[0]); });
+
+filterInput.addEventListener('input', applyFilters);
+eventFilter.addEventListener('change', applyFilters);
+levelFilter.addEventListener('change', applyFilters);
+exportBtn.addEventListener('click', exportCsv);
+
+let sortCol = 'index';
+let sortAsc = true;
+document.querySelectorAll('th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (sortCol === col) { sortAsc = !sortAsc; } else { sortCol = col; sortAsc = true; }
+    applyFilters();
+  });
+});
+
+async function loadFile(file) {
+  status.className = 'status'; status.textContent = `Parsing ${file.name} (${(file.size/1024/1024).toFixed(1)} MB)...`;
+  summary.classList.add('hidden'); controls.classList.add('hidden'); tableContainer.classList.add('hidden');
+  try {
+    const buf = await file.arrayBuffer();
+    const t0 = performance.now();
+    const { events } = parseEtlFile(buf);
+    const elapsed = ((performance.now()-t0)/1000).toFixed(2);
+
+    allRows = events.map((e,i) => ({
+      index: i+1,
+      timestamp: e.timestamp ?? 0n,
+      processId: e.processId ?? 0,
+      threadId: e.threadId ?? 0,
+      eventId: e.eventDescriptor?.id ?? '',
+      level: e.eventDescriptor?.level ?? '',
+      eventName: e.traceLogging?.name ?? e.recordType,
+      providerId: e.providerId ?? '',
+      fields: e.traceLogging ? JSON.stringify(e.traceLogging.fields, replacer) : `[${e.userData?.length ?? 0} bytes]`,
+    }));
+
+    const names = [...new Set(allRows.map(r=>r.eventName))].sort();
+    eventFilter.innerHTML = '<option value="">All</option>' + names.map(n=>`<option value="${n}">${n}</option>`).join('');
+
+    const tlCount = events.filter(e=>e.traceLogging).length;
+    status.textContent = `Parsed ${file.name} in ${elapsed}s`;
+    summary.textContent = `${events.length} events (${tlCount} TraceLogging) | ${names.length} event types`;
+    summary.classList.remove('hidden'); controls.classList.remove('hidden'); tableContainer.classList.remove('hidden');
+    applyFilters();
+  } catch(e) {
+    status.className = 'status error'; status.textContent = `Error: ${e.message}`;
+    console.error(e);
+  }
+}
+
+function applyFilters() {
+  const text = filterInput.value.toLowerCase();
+  const evName = eventFilter.value;
+  const lvl = levelFilter.value;
+  let rows = allRows;
+  if (evName) rows = rows.filter(r => r.eventName === evName);
+  if (lvl) rows = rows.filter(r => String(r.level) === lvl);
+  if (text) rows = rows.filter(r =>
+    String(r.eventName).toLowerCase().includes(text) ||
+    String(r.providerId).toLowerCase().includes(text) ||
+    String(r.fields).toLowerCase().includes(text) ||
+    String(r.processId).includes(text) ||
+    String(r.threadId).includes(text) ||
+    String(r.eventId).includes(text)
+  );
+  rows = [...rows];
+  rows.sort((a, b) => {
+    let va = a[sortCol], vb = b[sortCol];
+    if (typeof va === 'bigint' || typeof vb === 'bigint') {
+      va = va ?? 0n; vb = vb ?? 0n;
+      if (va < vb) return sortAsc ? -1 : 1;
+      if (va > vb) return sortAsc ? 1 : -1;
+      return 0;
+    }
+    if (typeof va === 'number' && typeof vb === 'number') return sortAsc ? va - vb : vb - va;
+    va = String(va); vb = String(vb);
+    return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+  });
+  renderTable(rows);
+}
+
+function renderTable(rows) {
+  const limit = 5000;
+  const display = rows.slice(0, limit);
+  const html = display.map(r => `<tr>
+    <td>${r.index}</td>
+    <td>${r.timestamp.toString()}</td>
+    <td>${r.processId}</td>
+    <td>${r.threadId}</td>
+    <td>${r.eventId}</td>
+    <td>${r.level}</td>
+    <td>${esc(r.eventName)}</td>
+    <td title="${esc(r.providerId)}">${esc(r.providerId.slice(0,13))}…</td>
+    <td class="fields-cell">${esc(r.fields)}</td>
+  </tr>`).join('');
+  tbody.innerHTML = html;
+  const note = rows.length > limit ? ` (showing first ${limit} of ${rows.length})` : '';
+  summary.textContent = summary.textContent.replace(/ \| Showing.*/, '') + ` | Showing ${display.length}${note}`;
+}
+
+function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function exportCsv() {
+  const headers = ['#','Timestamp','PID','TID','EventID','Level','Event','Provider','Fields'];
+  const csvRows = [headers.join(',')];
+  for (const r of allRows) {
+    csvRows.push([r.index, r.timestamp.toString(), r.processId, r.threadId, r.eventId, r.level,
+      `"${r.eventName.replace(/"/g,'""')}"`, r.providerId, `"${r.fields.replace(/"/g,'""')}"`].join(','));
+  }
+  const blob = new Blob([csvRows.join('\n')], {type:'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'etl-events.csv'; a.click();
+}
+</script>
+</body>
+</html>

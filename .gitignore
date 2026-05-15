@@ -1,3 +1,2 @@
 node_modules/
-*.etl
-FmtFile.txt
+etl-viewer.html

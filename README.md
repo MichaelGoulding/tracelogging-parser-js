@@ -91,6 +91,22 @@ Each event object contains:
 
 UnicodeString, AnsiString, CountedString, CountedAnsiString, Int8/16/32/64, UInt8/16/32/64, Float, Double, Bool32, HexInt32/64, GUID, FileTime, SystemTime, SID, Binary, CountedBinary, arrays.
 
+## HTML Viewer
+
+A self-contained HTML file (`etl-viewer.html`) lets you open and view ETL files in any browser — no server required. Drag-and-drop an ETL file or use the file picker. Features sortable columns, text/event/level filters, and CSV export.
+
+To build it from source:
+
+```bash
+npm run build:viewer
+```
+
+This inlines all `src/*.js` modules into `viewer/template.html` and writes `etl-viewer.html`. Edit the template or source files and re-run to regenerate.
+
+## Compressed ETL files
+
+ETL files written with buffer compression (XPRESS / Plain LZ77) are automatically decompressed during parsing. No extra configuration needed.
+
 ## Tests
 
 ```bash
